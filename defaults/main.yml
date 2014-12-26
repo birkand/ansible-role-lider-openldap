@@ -1,0 +1,6 @@
+ldap_domain: portos
+ldap_base_dn: dc=portos    
+ldap_admin: cn=admin,{{ldap_base_dn}}
+ldap_admin_pwd: admin
+ldap_config_admin_pwd: admin
+ldap_purge_previous: false

@@ -1,0 +1,30 @@
+dn: olcDatabase=hdb,cn=config
+changetype: add
+objectClass: olcHdbConfig
+objectClass: olcDatabaseConfig
+olcDatabase: hdb
+olcDbDirectory: /var/lib/ldap/{{ ldap_domain }}
+#olcAccess: {0}to attrs=userPassword,shadowLastChange by self write by anonymous auth by dn="{{ldap_admin}}"
+# write by group.exact="ldapadmingroupdn" write by * none
+#olcAccess: {1}to dn.base="" by * read
+#olcAccess: {2}to * by self write by dn="{{ldap_admin}}" 
+# write by group.exact="ldapadmingroupdn" write by * read
+olcDbCheckpoint: 512 30
+olcDbConfig: {0}set_cachesize 0 2097152 0
+olcDbConfig: {1}set_lk_max_objects 1500
+olcDbConfig: {2}set_lk_max_locks 1500
+olcDbConfig: {3}set_lk_max_lockers 1500
+olcDbIndex: objectClass eq
+olcDbIndex: uid eq
+olcDbIndex: cn,sn,title approx
+#olcLastMod: TRUE
+olcRootDN: {{ldap_admin}}
+olcRootPW: {{ adminpwdhash.stdout }}
+olcSuffix: {{ldap_base_dn}}
+
+#dn: {{ldap_base_dn}}
+#changetype: add
+#objectClass: organization
+#objectClass: dcObject
+#objectClass: top
+#o: {{ ldap_domain }}

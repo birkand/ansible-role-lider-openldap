@@ -1,0 +1,124 @@
+---
+- name: purge if ldap exists
+  apt: pkg=slapd state=absent purge=true
+  when: ldap_purge_previous
+  tags: ldap
+
+- name: install ldap
+  apt: pkg={{ item }} state=present
+  with_items:
+   - slapd
+   - ldap-utils
+  tags:
+   - ldap
+
+- name: slapd service should be started
+  service: name=slapd state=started
+  tags:
+   - ldap
+
+- name: generate encrypted ldap config admin password
+  shell: slappasswd -h {SSHA} -s {{ ldap_config_admin_pwd }}
+  register: configadminpwdhash
+  tags:
+   - ldap
+   - ldap-db
+
+- name: generate encrypted ldap admin password
+  shell: slappasswd -h {SSHA} -s {{ ldap_admin_pwd }}
+  register: adminpwdhash
+  tags:
+   - ldap
+   - ldap-db
+
+- name: copy change config admin pwd template
+  template: src=ldap_passwords.ldif.j2 dest=/tmp/ldap_passwords.ldif
+  sudo: no
+  tags: 
+   - ldap
+   - ldap-db
+
+- name: copy create db template
+  template: src=ldap_db.ldif.j2 dest=/tmp/ldap_db.ldif
+  sudo: no
+  tags: 
+   - ldap
+   - ldap-db
+
+- name: create openldap directory for new db
+  file: path=/var/lib/ldap/{{ ldap_domain }} owner=openldap group=openldap mode=0755 state=directory
+  sudo: yes
+  tags:
+   - ldap
+   - ldap-db
+
+- name: create ldap db entry in cn=config
+  shell: ldapmodify -Y EXTERNAL -H ldapi:/// -f /tmp/ldap_db.ldif
+  register: result
+  ignore_errors: yes
+  tags:
+   - ldap
+   - ldap-db
+
+- name: set ldap password
+  shell: ldapmodify -Y EXTERNAL -H ldapi:/// -f /tmp/ldap_passwords.ldif
+  tags:
+   - ldap
+
+- name: load ppolicy schema
+  shell:  ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/ldap/schema/ppolicy.ldif
+  ignore_errors: yes
+  #ldapadd -x -f /etc/ldap/schema/ppolicy.ldif -D "{{ ldapconfigadmindn }}" -w {{ ldap_config_admin_pwd }}
+  tags:
+   - ldap
+
+
+- name: copy ppolicy modules ldif
+  copy: src=load_ppolicy_modules.ldif dest=/tmp/load_ppolicy_modules.ldif
+  sudo: no
+  tags: 
+   - ldap
+
+- name: load ppolicy_modules
+  shell: ldapmodify -Y EXTERNAL -H ldapi:/// -f /tmp/load_ppolicy_modules.ldif
+  ignore_errors: yes
+  tags:
+   - ldap
+
+- name: copy ahenk schema ldif
+  copy: src=lider_ahenk.ldif dest=/tmp/lider_ahenk.ldif
+  sudo: no
+  tags: 
+   - ldap
+
+- name: load ahenk schema
+  shell: ldapmodify -Y EXTERNAL -H ldapi:/// -f /tmp/lider_ahenk.ldif
+  ignore_errors: yes
+  #when: result|success
+  tags:
+   - ldap
+
+- name: copy test data ldif template
+  copy: src=test-data.ldif dest=/tmp/test-data.ldif
+  ignore_errors: yes
+  #when: result|success
+  tags: 
+   - ldap
+   - ldap-test-data
+
+- name: configure base dn in test data ldif
+  replace: "dest=/tmp/test-data.ldif regexp='BASE_DN' replace='{{ ldap_base_dn }}'"
+  ignore_errors: yes
+  #when: result|success
+  tags: 
+   - ldap
+   - ldap-test-data
+
+- name: import test data ldif
+  shell: "ldapadd -D {{ ldap_admin }} -w {{ ldap_admin_pwd }}  -H ldapi:/// -f /tmp/test-data.ldif"
+  #shell: "ldapadd -Y EXTERNAL  -H ldapi:/// -f /tmp/test-data.ldif"
+  ignore_errors: yes
+  #when: result|success
+  tags: 
+   - ldap
+   - ldap-test-data
